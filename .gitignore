@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+deploy-homepage.tar
 
 # Editor directories and files
 .vscode/*
