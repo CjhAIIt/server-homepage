@@ -1,15 +1,12 @@
 <template>
-  <!-- 基本信息 -->
   <div class="message">
-    <!-- Logo -->
     <div class="logo">
       <img class="logo-img" :src="siteLogo" alt="logo" />
-      <div :class="{ name: true, 'text-hidden': true, long: siteUrl[0].length >= 6 }">
-        <span class="bg">{{ siteUrl[0] }}</span>
-        <span class="sm">.{{ siteUrl[1] }}</span>
+      <div :class="{ name: true, 'text-hidden': true, long: siteLabel.main.length >= 6 }">
+        <span class="bg">{{ siteLabel.main }}</span>
+        <span v-if="siteLabel.sub" class="sm">.{{ siteLabel.sub }}</span>
       </div>
     </div>
-    <!-- 简介 -->
     <div class="description cards" @click="changeBox">
       <div class="content">
         <Icon size="16">
@@ -32,47 +29,47 @@
 <script setup>
 import { Icon } from "@vicons/utils";
 import { QuoteLeft, QuoteRight } from "@vicons/fa";
-import { Error } from "@icon-park/vue-next";
+import { Error as ErrorIcon } from "@icon-park/vue-next";
 import { mainStore } from "@/store";
-const store = mainStore();
 
-// 主页站点logo
+const store = mainStore();
 const siteLogo = import.meta.env.VITE_SITE_MAIN_LOGO;
-// 站点链接
-const siteUrl = computed(() => {
-  const url = import.meta.env.VITE_SITE_URL;
-  if (!url) return "imsyy.top".split(".");
-  // 判断协议前缀
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    const urlFormat = url.replace(/^(https?:\/\/)/, "");
-    return urlFormat.split(".");
+
+const siteLabel = computed(() => {
+  const label = import.meta.env.VITE_SITE_LABEL?.trim();
+  if (label) {
+    const [main, sub] = label.split(".");
+    return { main, sub };
   }
-  return url.split(".");
+
+  const url = import.meta.env.VITE_SITE_URL;
+  if (!url) return { main: "home", sub: "" };
+  const plainUrl = url.replace(/^(https?:\/\/)/, "");
+  const [main, sub] = plainUrl.split(".");
+  return { main, sub };
 });
 
-// 简介区域文字
 const descriptionText = reactive({
   hello: import.meta.env.VITE_DESC_HELLO,
   text: import.meta.env.VITE_DESC_TEXT,
 });
 
-// 切换右侧功能区
 const changeBox = () => {
   if (store.getInnerWidth >= 721) {
     store.boxOpenState = !store.boxOpenState;
-  } else {
-    ElMessage({
-      message: "当前页面宽度不足以开启盒子",
-      grouping: true,
-      icon: h(Error, {
-        theme: "filled",
-        fill: "#efefef",
-      }),
-    });
+    return;
   }
+
+  ElMessage({
+    message: "当前页面宽度不足以打开功能面板",
+    grouping: true,
+    icon: h(ErrorIcon, {
+      theme: "filled",
+      fill: "#efefef",
+    }),
+  });
 };
 
-// 监听状态变化
 watch(
   () => store.boxOpenState,
   (value) => {
@@ -166,28 +163,5 @@ watch(
       pointer-events: none;
     }
   }
-  // @media (max-width: 390px) {
-  //   .logo {
-  //     flex-direction: column;
-  //     .logo-img {
-  //       display: none;
-  //     }
-  //     .name {
-  //       margin-left: 0;
-  //       height: auto;
-  //       transform: none;
-  //       text-align: center;
-  //       .bg {
-  //         font-size: 3.5rem;
-  //       }
-  //       .sm {
-  //         font-size: 1.4rem;
-  //       }
-  //     }
-  //   }
-  //   .description {
-  //     margin-top: 2.5rem;
-  //   }
-  // }
 }
 </style>

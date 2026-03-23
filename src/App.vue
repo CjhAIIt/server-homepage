@@ -1,9 +1,6 @@
 <template>
-  <!-- 加载 -->
   <Loading />
-  <!-- 壁纸 -->
   <Background @loadComplete="loadComplete" />
-  <!-- 主界面 -->
   <Transition name="fade" mode="out-in">
     <main id="main" v-if="store.imgLoadStatus">
       <div class="container" v-show="!store.backgroundShow">
@@ -16,7 +13,6 @@
           <MoreSet />
         </section>
       </div>
-      <!-- 移动端菜单按钮 -->
       <Icon
         class="menu"
         size="24"
@@ -25,9 +21,38 @@
       >
         <component :is="store.mobileOpenState ? CloseSmall : HamburgerButton" />
       </Icon>
-      <!-- 页脚 -->
       <Transition name="fade" mode="out-in">
         <Footer class="f-ter" v-show="!store.backgroundShow && !store.setOpenState" />
+      </Transition>
+
+      <Transition name="fade" mode="out-in">
+        <div v-if="!store.siteManageLoggedIn" class="login-screen">
+          <div class="login-card cards" @click.stop>
+            <div class="login-title">主页登录</div>
+            <div class="login-desc">访问 172.18.8.107 时需先登录后进入首页</div>
+            <el-form label-position="top">
+              <el-form-item label="用户名">
+                <el-input
+                  v-model="loginForm.username"
+                  placeholder="请输入用户名"
+                  @keyup.enter="handleSiteLogin"
+                />
+              </el-form-item>
+              <el-form-item label="密码">
+                <el-input
+                  v-model="loginForm.password"
+                  type="password"
+                  show-password
+                  placeholder="请输入密码"
+                  @keyup.enter="handleSiteLogin"
+                />
+              </el-form-item>
+            </el-form>
+            <el-button type="primary" :loading="loginLoading" @click="handleSiteLogin">
+              进入主页
+            </el-button>
+          </div>
+        </div>
       </Transition>
     </main>
   </Transition>
@@ -36,6 +61,7 @@
 <script setup>
 import { helloInit, checkDays } from "@/utils/getTime.js";
 import { HamburgerButton, CloseSmall } from "@icon-park/vue-next";
+import { loginSiteManager } from "@/api";
 import { mainStore } from "@/store";
 import { Icon } from "@vicons/utils";
 import Loading from "@/components/Loading.vue";
@@ -49,23 +75,45 @@ import cursorInit from "@/utils/cursor.js";
 import config from "@/../package.json";
 
 const store = mainStore();
+const loginLoading = ref(false);
+const loginForm = reactive({
+  username: store.siteManageUser?.username || "",
+  password: "",
+});
 
-// 页面宽度
 const getWidth = () => {
   store.setInnerWidth(window.innerWidth);
 };
 
-// 加载完成事件
 const loadComplete = () => {
   nextTick(() => {
-    // 欢迎提示
     helloInit();
-    // 默哀模式
     checkDays();
   });
 };
 
-// 监听宽度变化
+const handleSiteLogin = async () => {
+  if (!loginForm.username.trim() || !loginForm.password) {
+    ElMessage.warning("请输入用户名和密码");
+    return;
+  }
+
+  loginLoading.value = true;
+  try {
+    const session = await loginSiteManager({
+      username: loginForm.username.trim(),
+      password: loginForm.password,
+    });
+    store.setSiteManageSession(session);
+    loginForm.password = "";
+    ElMessage.success("登录成功");
+  } catch (error) {
+    ElMessage.error(error?.message || "登录失败");
+  } finally {
+    loginLoading.value = false;
+  }
+};
+
 watch(
   () => store.innerWidth,
   (value) => {
@@ -77,39 +125,34 @@ watch(
 );
 
 onMounted(() => {
-  // 自定义鼠标
   cursorInit();
 
-  // 屏蔽右键
   document.oncontextmenu = () => {
     ElMessage({
-      message: "为了浏览体验，本站禁用右键",
+      message: "为了浏览体验，当前页面禁用右键",
       grouping: true,
       duration: 2000,
     });
     return false;
   };
 
-  // 鼠标中键事件
   window.addEventListener("mousedown", (event) => {
-    if (event.button == 1) {
+    if (event.button === 1) {
       store.backgroundShow = !store.backgroundShow;
       ElMessage({
-        message: `已${store.backgroundShow ? "开启" : "退出"}壁纸展示状态`,
+        message: `${store.backgroundShow ? "开启" : "关闭"}壁纸展示状态`,
         grouping: true,
       });
     }
   });
 
-  // 监听当前页面宽度
   getWidth();
   window.addEventListener("resize", getWidth);
 
-  // 控制台输出
   const styleTitle1 = "font-size: 20px;font-weight: 600;color: rgb(244,167,89);";
   const styleTitle2 = "font-size:12px;color: rgb(244,167,89);";
   const styleContent = "color: rgb(30,152,255);";
-  const title1 = "無名の主页";
+  const title1 = "主页";
   const title2 = `
  _____ __  __  _______     ____     __
 |_   _|  \\/  |/ ____\\ \\   / /\\ \\   / /
@@ -117,7 +160,7 @@ onMounted(() => {
   | | | |\\/| |\\___ \\  \\   /    \\   /
  _| |_| |  | |____) |  | |      | |
 |_____|_|  |_|_____/   |_|      |_|`;
-  const content = `\n\n版本: ${config.version}\n主页: ${config.home}\nGithub: ${config.github}`;
+  const content = `\n\n版本: ${config.version}\n首页: ${config.home}\nGithub: ${config.github}`;
   console.info(`%c${title1} %c${title2} %c${content}`, styleTitle1, styleTitle2, styleContent);
 });
 
@@ -190,6 +233,33 @@ onBeforeUnmount(() => {
       display: none;
     }
   }
+  .login-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 45%);
+    backdrop-filter: blur(16px);
+    padding: 24px;
+    .login-card {
+      width: min(420px, 100%);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .login-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    .login-desc {
+      font-size: 0.95rem;
+      color: rgb(255 255 255 / 75%);
+      line-height: 1.6;
+    }
+  }
   @media (max-height: 720px) {
     overflow-y: auto;
     overflow-x: hidden;
@@ -200,36 +270,35 @@ onBeforeUnmount(() => {
         width: calc(100% + 6px);
       }
       @media (min-width: 391px) {
-        // w 1201px ~ max
         padding-left: 0.7vw;
         padding-right: 0.25vw;
-        @media (max-width: 1200px) { // w 1101px ~ 1280px
+        @media (max-width: 1200px) {
           padding-left: 2.3vw;
           padding-right: 1.75vw;
         }
-        @media (max-width: 1100px) { // w 993px ~ 1100px
+        @media (max-width: 1100px) {
           padding-left: 2vw;
           padding-right: calc(2vw - 6px);
         }
-        @media (max-width: 992px) { // w 901px ~ 992px
+        @media (max-width: 992px) {
           padding-left: 2.3vw;
           padding-right: 1.7vw;
         }
-        @media (max-width: 900px) { // w 391px ~ 900px
+        @media (max-width: 900px) {
           padding-left: 2vw;
           padding-right: calc(2vw - 6px);
         }
       }
     }
     .menu {
-      top: 605.64px; // 721px * 0.84
-      left: 170.5px; // 391 * 0.5 - 25px
+      top: 605.64px;
+      left: 170.5px;
       @media (min-width: 391px) {
         left: calc(50% - 25px);
       }
     }
     .f-ter {
-      top: 675px; // 721px - 46px
+      top: 675px;
       @media (min-width: 391px) {
         padding-left: 6px;
       }
@@ -241,7 +310,7 @@ onBeforeUnmount(() => {
       width: 391px;
     }
     .menu {
-      left: 167.5px; // 391px * 0.5 - 28px
+      left: 167.5px;
     }
     .f-ter {
       width: 391px;

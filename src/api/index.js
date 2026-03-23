@@ -1,16 +1,53 @@
 // import axios from "axios";
 import fetchJsonp from "fetch-jsonp";
 
+const SITE_MANAGER_ACCOUNT = {
+  username: "lab",
+  password: "a6n107",
+};
+
+export const loginSiteManager = async ({ username, password }) => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  if (
+    username === SITE_MANAGER_ACCOUNT.username &&
+    password === SITE_MANAGER_ACCOUNT.password
+  ) {
+    return {
+      username: SITE_MANAGER_ACCOUNT.username,
+      token: "site-manager-token",
+    };
+  }
+
+  throw new Error("用户名或密码错误");
+};
+
 /**
  * 音乐播放器
  */
 
 // 获取音乐播放列表
 export const getPlayerList = async (server, type, id) => {
-  const res = await fetch(
-    `${import.meta.env.VITE_SONG_API}?server=${server}&type=${type}&id=${id}`,
-  );
+  const songApi = import.meta.env.VITE_SONG_API?.trim();
+  if (!songApi) {
+    throw new Error("未配置音乐接口地址");
+  }
+
+  let res;
+  try {
+    res = await fetch(`${songApi}?server=${server}&type=${type}&id=${id}`);
+  } catch (error) {
+    throw new Error("音乐接口无法连接");
+  }
+
+  if (!res.ok) {
+    throw new Error(`音乐接口请求失败（${res.status}）`);
+  }
+
   const data = await res.json();
+  if (!Array.isArray(data) || !data.length) {
+    throw new Error("音乐列表为空");
+  }
 
   if (data[0].url.startsWith("@")) {
     // eslint-disable-next-line no-unused-vars

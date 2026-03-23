@@ -1,16 +1,12 @@
 <template>
-  <div class="weather" v-if="weatherData.adCode.city && weatherData.weather.weather">
-    <span>{{ weatherData.adCode.city }}&nbsp;</span>
-    <span>{{ weatherData.weather.weather }}&nbsp;</span>
-    <span>{{ weatherData.weather.temperature }}℃</span>
+  <div class="weather" v-if="weatherData.city && weatherData.weather">
+    <span>{{ weatherData.city }}&nbsp;</span>
+    <span>{{ weatherData.weather }}&nbsp;</span>
+    <span>{{ weatherData.temperature }}&deg;C</span>
     <span class="sm-hidden">
-      &nbsp;{{
-        weatherData.weather.winddirection?.endsWith("风")
-          ? weatherData.weather.winddirection
-          : weatherData.weather.winddirection + "风"
-      }}&nbsp;
+      &nbsp;{{ formatWindDirection(weatherData.windDirection) }}&nbsp;
     </span>
-    <span class="sm-hidden">{{ weatherData.weather.windpower }}&nbsp;级</span>
+    <span class="sm-hidden">{{ weatherData.windPower }}&nbsp;级</span>
   </div>
   <div class="weather" v-else>
     <span>天气数据获取失败</span>
@@ -18,88 +14,132 @@
 </template>
 
 <script setup>
-import { getAdcode, getWeather, getOtherWeather } from "@/api";
-import { Error } from "@icon-park/vue-next";
+import { Error as ErrorIcon } from "@icon-park/vue-next";
 
-// 高德开发者 Key
-const mainKey = import.meta.env.VITE_WEATHER_KEY;
+const AMAP_SCRIPT_ID = "amap-weather-sdk";
+const AMAP_SCRIPT_URL = "https://webapi.amap.com/maps";
 
-// 天气数据
+let amapLoader = null;
+
+const weatherKey = (import.meta.env.VITE_WEATHER_KEY || "").trim();
+const weatherSecurityCode = (import.meta.env.VITE_WEATHER_SECURITY_CODE || "").trim();
+const fallbackCity = (import.meta.env.VITE_WEATHER_CITY || "芜湖市").trim();
+
 const weatherData = reactive({
-  adCode: {
-    city: null, // 城市
-    adcode: null, // 城市编码
-  },
-  weather: {
-    weather: null, // 天气现象
-    temperature: null, // 实时气温
-    winddirection: null, // 风向描述
-    windpower: null, // 风力级别
-  },
+  city: null,
+  weather: null,
+  temperature: null,
+  windDirection: null,
+  windPower: null,
 });
 
-// 取出天气平均值
-const getTemperature = (min, max) => {
-  try {
-    // 计算平均值并四舍五入
-    const average = (Number(min) + Number(max)) / 2;
-    return Math.round(average);
-  } catch (error) {
-    console.error("计算温度出现错误：", error);
-    return "NaN";
-  }
+const formatWindDirection = (value) => {
+  if (!value) return "-";
+  return value.endsWith("风") ? value : `${value}风`;
 };
 
-// 获取天气数据
-const getWeatherData = async () => {
-  try {
-    // 获取地理位置信息
-    if (!mainKey) {
-      console.log("未配置，使用备用天气接口");
-      const result = await getOtherWeather();
-      console.log(result);
-      const data = result.result;
-      weatherData.adCode = {
-        city: data.city.City || "未知地区",
-        // adcode: data.city.cityId,
-      };
-      weatherData.weather = {
-        weather: data.condition.day_weather,
-        temperature: getTemperature(data.condition.min_degree, data.condition.max_degree),
-        winddirection: data.condition.day_wind_direction,
-        windpower: data.condition.day_wind_power,
-      };
-    } else {
-      // 获取 Adcode
-      const adCode = await getAdcode(mainKey);
-      console.log(adCode);
-      if (adCode.infocode !== "10000") {
-        throw "地区查询失败";
-      }
-      weatherData.adCode = {
-        city: adCode.city,
-        adcode: adCode.adcode,
-      };
-      // 获取天气信息
-      const result = await getWeather(mainKey, weatherData.adCode.adcode);
-      weatherData.weather = {
-        weather: result.lives[0].weather,
-        temperature: result.lives[0].temperature,
-        winddirection: result.lives[0].winddirection,
-        windpower: result.lives[0].windpower,
+const loadAmap = () => {
+  if (window.AMap) {
+    return Promise.resolve(window.AMap);
+  }
+
+  if (amapLoader) {
+    return amapLoader;
+  }
+
+  if (!weatherKey) {
+    return Promise.reject(new Error("未配置高德 Web 端 Key"));
+  }
+
+  amapLoader = new Promise((resolve, reject) => {
+    if (weatherSecurityCode) {
+      window._AMapSecurityConfig = {
+        securityJsCode: weatherSecurityCode,
       };
     }
-  } catch (error) {
-    console.error("天气信息获取失败:" + error);
-    onError("天气信息获取失败");
-  }
+
+    const existingScript = document.getElementById(AMAP_SCRIPT_ID);
+    const script =
+      existingScript ||
+      Object.assign(document.createElement("script"), {
+        id: AMAP_SCRIPT_ID,
+        src: `${AMAP_SCRIPT_URL}?v=2.0&key=${weatherKey}&plugin=AMap.CitySearch,AMap.Weather`,
+        async: true,
+        defer: true,
+      });
+
+    const cleanup = () => {
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+    };
+
+    const handleLoad = () => {
+      cleanup();
+      if (window.AMap) {
+        resolve(window.AMap);
+      } else {
+        reject(new Error("高德 JS API 加载失败"));
+      }
+    };
+
+    const handleError = () => {
+      cleanup();
+      reject(new Error("高德 JS API 加载失败"));
+    };
+
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+
+    if (!existingScript) {
+      document.head.appendChild(script);
+    }
+  });
+
+  return amapLoader;
 };
 
-// 报错信息
+const getCurrentCity = (AMap) => {
+  return new Promise((resolve, reject) => {
+    const citySearch = new AMap.CitySearch();
+
+    citySearch.getLocalCity((status, result) => {
+      if (status === "complete" && (result?.adcode || result?.city)) {
+        resolve({
+          city: result.city || result.province || fallbackCity,
+          adcode: result.adcode || null,
+        });
+        return;
+      }
+
+      reject(new Error(result?.info || "城市定位失败"));
+    });
+  });
+};
+
+const getLiveWeather = (AMap, city) => {
+  return new Promise((resolve, reject) => {
+    const weather = new AMap.Weather();
+
+    weather.getLive(city, (error, liveData) => {
+      if (error) {
+        reject(new Error(error.info || "天气查询失败"));
+        return;
+      }
+
+      if (!liveData) {
+        reject(new Error("天气数据为空"));
+        return;
+      }
+
+      resolve(liveData);
+    });
+  });
+};
+
 const onError = (message) => {
   ElMessage({
     message,
-    icon: h(Error, {
+    icon: h(ErrorIcon, {
       theme: "filled",
       fill: "#efefef",
     }),
@@ -107,8 +147,35 @@ const onError = (message) => {
   console.error(message);
 };
 
+const getWeatherData = async () => {
+  try {
+    const AMap = await loadAmap();
+
+    let cityInfo;
+    try {
+      cityInfo = await getCurrentCity(AMap);
+    } catch (error) {
+      cityInfo = {
+        city: fallbackCity,
+        adcode: null,
+      };
+      console.warn("城市自动定位失败，已切换到固定城市:", error);
+    }
+
+    const liveWeather = await getLiveWeather(AMap, cityInfo.adcode || cityInfo.city);
+
+    weatherData.city = liveWeather.city || cityInfo.city;
+    weatherData.weather = liveWeather.weather;
+    weatherData.temperature = liveWeather.temperature;
+    weatherData.windDirection = liveWeather.windDirection;
+    weatherData.windPower = liveWeather.windPower;
+  } catch (error) {
+    console.error("天气信息获取失败:", error);
+    onError(error?.message || "天气信息获取失败");
+  }
+};
+
 onMounted(() => {
-  // 调用获取天气
   getWeatherData();
 });
 </script>

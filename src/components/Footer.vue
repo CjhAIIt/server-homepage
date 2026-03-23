@@ -5,25 +5,19 @@
         <span>
           <span :class="startYear < fullYear ? 'c-hidden' : 'hidden'">Copyright&nbsp;</span>
           &copy;
-          <span v-if="startYear < fullYear"
-            class="site-start">
-            {{ startYear }}
-            -
+          <span v-if="startYear < fullYear" class="site-start">
+            {{ startYear }} -
           </span>
           {{ fullYear }}
-          <a :href="siteUrl">{{ siteAuthor }}</a>
+          <a :href="siteAuthorUrl" target="_blank" rel="noreferrer">{{ siteAuthor }}</a>
         </span>
-        <!-- 以下信息请不要修改哦 -->
         <span class="hidden">
           &amp;&nbsp;Made&nbsp;by
-          <a :href="config.github" target="_blank">
-            {{ config.author }}
-          </a>
+          <a :href="config.github" target="_blank" rel="noreferrer">{{ config.author }}</a>
         </span>
-        <!-- 站点备案 -->
         <span>
           &amp;
-          <a v-if="siteIcp" href="https://beian.miit.gov.cn" target="_blank">
+          <a v-if="siteIcp" href="https://beian.miit.gov.cn" target="_blank" rel="noreferrer">
             {{ siteIcp }}
           </a>
         </span>
@@ -48,21 +42,18 @@ import config from "@/../package.json";
 
 const store = mainStore();
 const fullYear = new Date().getFullYear();
-
-// 加载配置数据
-// const siteStartDate = ref(import.meta.env.VITE_SITE_START);
 const startYear = ref(
-  import.meta.env.VITE_SITE_START?.length >= 4 ? 
-  import.meta.env.VITE_SITE_START.substring(0, 4) : null
+  import.meta.env.VITE_SITE_START?.length >= 4
+    ? import.meta.env.VITE_SITE_START.substring(0, 4)
+    : null,
 );
 const siteIcp = ref(import.meta.env.VITE_SITE_ICP);
-const siteAuthor = ref(import.meta.env.VITE_SITE_AUTHOR);
-const siteUrl = computed(() => {
-  const url = import.meta.env.VITE_SITE_URL;
-  if (!url) return "https://www.imsyy.top";
-  // 判断协议前缀
+const siteAuthor = ref(import.meta.env.VITE_SITE_AUTHOR || "CjhAIIt");
+const siteAuthorUrl = computed(() => {
+  const url = import.meta.env.VITE_SITE_AUTHOR_URL || import.meta.env.VITE_SITE_URL;
+  if (!url) return "https://github.com/CjhAIIt";
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    return "//" + url;
+    return `http://${url}`;
   }
   return url;
 });
@@ -79,7 +70,6 @@ const siteUrl = computed(() => {
   text-align: center;
   z-index: 0;
   font-size: 14px;
-  // 文字不换行
   word-break: keep-all;
   white-space: nowrap;
   .power {
