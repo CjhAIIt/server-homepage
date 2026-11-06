@@ -28,15 +28,15 @@
 
 ### 环境要求
 
-- Node.js 18+
-- pnpm 8+ 或 npm
+- Node.js 24
+- pnpm 11.25.0（与 `packageManager`、CI 和 Docker 保持一致）
 
 ### 本地开发
 
 先复制 `.env.example` 为 `.env`，再安装依赖并启动开发服务。
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -79,7 +79,7 @@ pnpm build
 ### 登录逻辑
 
 当前登录校验是前端内置的演示实现，代码在 `src/api/index.js` 的 `loginSiteManager` 中。  
-如果要用于生产环境，建议改成你自己的后端认证接口，或至少修改默认账号逻辑。
+登录账号、校验逻辑和固定令牌都包含在可下载的浏览器代码中，不能保护页面、链接或静态资源。修改默认密码或将密码放入 `VITE_*` 环境变量仍会暴露在构建产物中。生产环境应在反向代理或后端执行认证，并保护实际资源；不要把敏感信息放在仅由前端登录层遮挡的页面中。
 
 ## Docker 部署
 

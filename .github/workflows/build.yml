@@ -5,6 +5,7 @@ name: Build Dev
 on:
   push:
     branches:
+      - main
       - dev
       - master
 
@@ -17,11 +18,16 @@ jobs:
       # 检出 Git 仓库
       - name: Check out git repository
         uses: actions/checkout@v4.1.1
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
       # 安装 Node.js
       - name: Install Node.js
         uses: actions/setup-node@v4.0.0
         with:
-          node-version: "18.x"
+          node-version: "24.x"
+          cache: pnpm
       # 复制环境变量文件
       - name: Copy .env.example
         run: |
@@ -32,12 +38,10 @@ jobs:
           }
       # 安装项目依赖
       - name: Install Dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
       # 构建程序
       - name: Build Website
-        run: npm run build
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: pnpm run build
       # 上传构建产物
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
